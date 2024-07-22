@@ -3,253 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monkey Banana Catch</title>
+    <title>Monkey Fruit Collector</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             background-color: #87CEEB;
             font-family: Arial, sans-serif;
+            touch-action: none;
         }
         #gameCanvas {
-            border: 2px solid #000;
+            border: 2px solid #8B4513;
+            max-width: 100%;
+            max-height: 100vh;
         }
-        #scoreDisplay {
+        #gameInfo {
             position: absolute;
             top: 10px;
             left: 10px;
-            font-size: 24px;
+            color: #FFFFFF;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px #000000;
+        }
+        #restartButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
             color: white;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
+            border: none;
             border-radius: 5px;
+            cursor: pointer;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <div id="scoreDisplay">Score: 0</div>
+    <div id="gameInfo">Score: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <button id="restartButton">Restart Game</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const scoreDisplay = document.getElementById('scoreDisplay');
+        const scoreElement = document.getElementById('score');
+        const restartButton = document.getElementById('restartButton');
 
-        // Game variables
         let score = 0;
-        let gameOver = false;
-        let monkeyX = canvas.width / 2;
-        const monkeyY = canvas.height - 100;
-        const monkeyWidth = 60;
-        const monkeyHeight = 80;
-        const itemWidth = 30;
-        const itemHeight = 30;
-        let items = [];
-        let gameSpeed = 1;
+        let gameLoop;
+        let monkey = { x: 200, y: 300, width: 80, height: 120, speed: 15 };
+        let bananas = [];
+        let apples = [];
+        let clouds = [];
 
-        // Tree positions
-        const trees = [
-            {x: 50, y: 0, width: 100, height: 600},
-            {x: 350, y: 0, width: 120, height: 600},
-            {x: 650, y: 0, width: 110, height: 600}
-        ];
-
-        // Event listener for keyboard input
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft' && monkeyX > 0) {
-                monkeyX -= 40; // Increased movement speed
-            } else if (e.key === 'ArrowRight' && monkeyX < canvas.width - monkeyWidth) {
-                monkeyX += 40; // Increased movement speed
-            }
-        });
-
-        function createItem() {
-            const treeIndex = Math.floor(Math.random() * trees.length);
-            const tree = trees[treeIndex];
-            const x = tree.x + Math.random() * (tree.width - itemWidth);
-            const type = Math.random() < 0.7 ? 'banana' : 'coconut';
-            items.push({ x, y: 0, type });
+        function resizeCanvas() {
+            canvas.width = window.innerWidth > 400 ? 400 : window.innerWidth - 20;
+            canvas.height = window.innerHeight > 600 ? 600 : window.innerHeight - 20;
+            monkey.y = canvas.height - monkey.height - 10;
         }
 
-        function drawMonkey(x, y) {
-            // Body
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(x + 15, y + 30, 30, 40);
-            
-            // Head
-            ctx.beginPath();
-            ctx.arc(x + 30, y + 25, 20, 0, Math.PI * 2);
-            ctx.fillStyle = '#8B4513';
-            ctx.fill();
-            
-            // Face
-            ctx.fillStyle = '#FFA07A';
-            ctx.beginPath();
-            ctx.arc(x + 30, y + 30, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Eyes
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(x + 25, y + 22, 5, 0, Math.PI * 2);
-            ctx.arc(x + 35, y + 22, 5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(x + 25, y + 22, 2, 0, Math.PI * 2);
-            ctx.arc(x + 35, y + 22, 2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Nose
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(x + 30, y + 30, 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Mouth
-            ctx.beginPath();
-            ctx.arc(x + 30, y + 35, 8, 0, Math.PI);
-            ctx.strokeStyle = 'black';
-            ctx.stroke();
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-            // Arms
-            ctx.strokeStyle = '#8B4513';
-            ctx.lineWidth = 8;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(x + 15, y + 40);
-            ctx.lineTo(x, y + 60);
-            ctx.moveTo(x + 45, y + 40);
-            ctx.lineTo(x + 60, y + 60);
-            ctx.stroke();
+        // Create monkey SVG with longer arms
+        const monkeySvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 150">
+            <circle cx="50" cy="40" r="35" fill="#8B4513"/>
+            <circle cx="50" cy="40" r="25" fill="#DEB887"/>
+            <circle cx="40" cy="35" r="5" fill="white"/>
+            <circle cx="60" cy="35" r="5" fill="white"/>
+            <circle cx="40" cy="35" r="2" fill="black"/>
+            <circle cx="60" cy="35" r="2" fill="black"/>
+            <ellipse cx="50" cy="50" rx="10" ry="5" fill="#8B4513"/>
+            <path d="M25 20 Q 50 0 75 20" fill="none" stroke="#8B4513" stroke-width="10"/>
+            <rect x="35" y="70" width="10" height="75" fill="#8B4513" rx="5"/>
+            <rect x="55" y="70" width="10" height="75" fill="#8B4513" rx="5"/>
+            <path d="M0 60 Q 25 50 20 100" fill="none" stroke="#8B4513" stroke-width="10"/>
+            <path d="M100 60 Q 75 50 80 100" fill="none" stroke="#8B4513" stroke-width="10"/>
+        </svg>`;
 
-            // Legs
-            ctx.beginPath();
-            ctx.moveTo(x + 20, y + 70);
-            ctx.lineTo(x + 15, y + 90);
-            ctx.moveTo(x + 40, y + 70);
-            ctx.lineTo(x + 45, y + 90);
-            ctx.stroke();
+        const bananaSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <path d="M50 10 Q 90 20 80 80 Q 70 90 60 80 Q 40 60 20 70 Q 10 60 20 50 Q 30 20 50 10" fill="#FFD700"/>
+            <path d="M30 40 Q 40 30 50 40" fill="none" stroke="#DAA520" stroke-width="2"/>
+        </svg>`;
 
-            // Tail
-            ctx.beginPath();
-            ctx.moveTo(x + 30, y + 70);
-            ctx.quadraticCurveTo(x + 60, y + 80, x + 55, y + 60);
-            ctx.stroke();
+        const appleSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="55" r="45" fill="#FF0000"/>
+            <path d="M50 10 Q 60 0 70 10 L 50 30 L 30 10 Q 40 0 50 10" fill="#00AA00"/>
+            <path d="M30 55 Q 50 75 70 55" fill="none" stroke="#AA0000" stroke-width="2"/>
+        </svg>`;
+
+        function svgToImage(svgString, width, height) {
+            return new Promise((resolve, reject) => {
+                const img = new Image(width, height);
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+            });
         }
 
-        function drawTree(x, y, width, height) {
-            // Trunk
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(x + width / 3, y + height / 3, width / 3, height * 2 / 3);
-            
-            // Leaves
-            ctx.fillStyle = '#228B22';
-            ctx.beginPath();
-            ctx.moveTo(x, y + height / 3);
-            ctx.lineTo(x + width / 2, y);
-            ctx.lineTo(x + width, y + height / 3);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.moveTo(x, y + height / 2);
-            ctx.lineTo(x + width / 2, y + height / 6);
-            ctx.lineTo(x + width, y + height / 2);
-            ctx.closePath();
-            ctx.fill();
+        let monkeyImg, bananaImg, appleImg;
+
+        async function loadImages() {
+            monkeyImg = await svgToImage(monkeySvg, monkey.width, monkey.height);
+            bananaImg = await svgToImage(bananaSvg, 40, 40);
+            appleImg = await svgToImage(appleSvg, 40, 40);
+            startGame();
         }
 
-        function drawBanana(x, y) {
-            ctx.fillStyle = 'yellow';
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.quadraticCurveTo(x + 15, y, x + 15, y + 15);
-            ctx.quadraticCurveTo(x + 15, y + 30, x, y + 30);
-            ctx.quadraticCurveTo(x + 5, y + 15, x, y);
-            ctx.fill();
-        }
-
-        function drawCoconut(x, y) {
-            ctx.fillStyle = '#90EE90'; // Light green color
-            ctx.beginPath();
-            ctx.arc(x + 15, y + 15, 15, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        function updateGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw sky
+        function drawSky() {
             ctx.fillStyle = '#87CEEB';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
 
-            // Draw ground
-            ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+        function createCloud() {
+            return {
+                x: canvas.width,
+                y: Math.random() * canvas.height / 2,
+                width: Math.random() * 60 + 40,
+                height: Math.random() * 40 + 20,
+                speed: Math.random() * 0.5 + 0.1
+            };
+        }
 
-            // Draw trees
-            trees.forEach(tree => drawTree(tree.x, tree.y, tree.width, tree.height));
+        function drawClouds() {
+            ctx.fillStyle = '#FFFFFF';
+            clouds.forEach(cloud => {
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.width / 2, Math.PI * 0.5, Math.PI * 1.5);
+                ctx.arc(cloud.x + cloud.width * 0.5, cloud.y - cloud.height * 0.5, cloud.height, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.width, cloud.y, cloud.width / 2, Math.PI * 1.5, Math.PI * 0.5);
+                ctx.closePath();
+                ctx.fill();
+            });
+        }
 
-            // Draw monkey
-            drawMonkey(monkeyX, monkeyY);
-
-            // Update and draw items
-            items.forEach((item, index) => {
-                item.y += 2 * gameSpeed;
-                if (item.type === 'banana') {
-                    drawBanana(item.x, item.y);
-                } else {
-                    drawCoconut(item.x, item.y);
-                }
-
-                // Check collision
-                if (
-                    item.y + itemHeight > monkeyY &&
-                    item.y < monkeyY + monkeyHeight &&
-                    item.x + itemWidth > monkeyX &&
-                    item.x < monkeyX + monkeyWidth
-                ) {
-                    if (item.type === 'banana') {
-                        score += 10;
-                        items.splice(index, 1);
-                    } else {
-                        gameOver = true;
-                    }
-                }
-
-                // Remove items that are off-screen
-                if (item.y > canvas.height) {
-                    items.splice(index, 1);
+        function updateClouds() {
+            clouds.forEach(cloud => {
+                cloud.x -= cloud.speed;
+                if (cloud.x + cloud.width < 0) {
+                    cloud.x = canvas.width;
+                    cloud.y = Math.random() * canvas.height / 2;
                 }
             });
 
-            // Update score display
-            scoreDisplay.textContent = `Score: ${score}`;
-
-            // Increase game speed
-            gameSpeed += 0.001;
-
-            if (gameOver) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.font = '48px Arial';
-                ctx.fillText('Game Over!', canvas.width / 2 - 100, canvas.height / 2);
-                ctx.font = '24px Arial';
-                ctx.fillText(`Final Score: ${score}`, canvas.width / 2 - 70, canvas.height / 2 + 40);
-            } else {
-                requestAnimationFrame(updateGame);
+            if (clouds.length < 3 && Math.random() < 0.02) {
+                clouds.push(createCloud());
             }
         }
 
-        // Start the game
-        setInterval(createItem, 1000);
-        updateGame();
+        function drawMonkey() {
+            ctx.drawImage(monkeyImg, monkey.x, monkey.y, monkey.width, monkey.height);
+        }
+
+        function drawFruit(fruit) {
+            ctx.drawImage(fruit.type === 'banana' ? bananaImg : appleImg, fruit.x, fruit.y, 40, 40);
+        }
+
+        function moveMonkey(direction) {
+            if (direction === 'left' && monkey.x > 0) monkey.x -= monkey.speed;
+            if (direction === 'right' && monkey.x < canvas.width - monkey.width) monkey.x += monkey.speed;
+        }
+
+        function createFruit() {
+            if (Math.random() < 0.02) {
+                const fruit = {
+                    x: Math.random() * (canvas.width - 40),
+                    y: 0,
+                    type: Math.random() < 0.7 ? 'banana' : 'apple'
+                };
+                (fruit.type === 'banana' ? bananas : apples).push(fruit);
+            }
+        }
+
+        function updateGame() {
+            drawSky();
+            updateClouds();
+            drawClouds();
+            drawMonkey();
+            createFruit();
+
+            [bananas, apples].forEach((fruits, index) => {
+                fruits.forEach((fruit, fruitIndex) => {
+                    fruit.y += 3;
+                    drawFruit(fruit);
+
+                    if (fruit.y > canvas.height) {
+                        fruits.splice(fruitIndex, 1);
+                    }
+
+                    if (
+                        fruit.x < monkey.x + monkey.width &&
+                        fruit.x + 40 > monkey.x &&
+                        fruit.y < monkey.y + monkey.height &&
+                        fruit.y + 40 > monkey.y
+                    ) {
+                        fruits.splice(fruitIndex, 1);
+                        if (fruit.type === 'banana') {
+                            score++;
+                            scoreElement.textContent = score;
+                        } else {
+                            endGame();
+                        }
+                    }
+                });
+            });
+        }
+
+        function endGame() {
+            clearInterval(gameLoop);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2);
+            stopMusic();
+            restartButton.style.display = 'block';
+        }
+
+        function resetGame() {
+            score = 0;
+            scoreElement.textContent = score;
+            monkey.x = canvas.width / 2 - monkey.width / 2;
+            bananas = [];
+            apples = [];
+            clouds = [createCloud(), createCloud()];
+            restartButton.style.display = 'none';
+            startGame();
+        }
+
+        restartButton.addEventListener('click', resetGame);
+
+        // Touch controls
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touchEndX = e.touches[0].clientX;
+            if (touchEndX < touchStartX) moveMonkey('left');
+            if (touchEndX > touchStartX) moveMonkey('right');
+            touchStartX = touchEndX;
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') moveMonkey('left');
+            if (e.key === 'ArrowRight') moveMonkey('right');
+        });
+
+        // Music (unchanged)
+        let audioContext;
+        let oscillator;
+        let gainNode;
+
+        function startMusic() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.type = 'square';
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+            const notes = [262, 294, 330, 349, 392, 440, 494, 523];
+            let noteIndex = 0;
+
+            function playNextNote() {
+                oscillator.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+                noteIndex = (noteIndex + 1) % notes.length;
+                setTimeout(playNextNote, 250);
+            }
+
+            oscillator.start();
+            playNextNote();
+        }
+
+        function stopMusic() {
+            if (oscillator) {
+                oscillator.stop();
+            }
+        }
+
+        function startGame() {
+            gameLoop = setInterval(updateGame, 1000 / 60);
+            startMusic();
+        }
+
+        document.addEventListener('click', function initAudio() {
+            if (audioContext) return;
+            startMusic();
+            document.removeEventListener('click', initAudio);
+        });
+
+        loadImages();
     </script>
 </body>
 </html>
