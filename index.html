@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monkey Fruit Collector</title>
+    <title>Tropical Monkey Fruit Collector</title>
     <style>
         body {
             margin: 0;
@@ -61,11 +61,13 @@
         let bananas = [];
         let apples = [];
         let clouds = [];
+        let palmTrees = [];
 
         function resizeCanvas() {
             canvas.width = window.innerWidth > 400 ? 400 : window.innerWidth - 20;
             canvas.height = window.innerHeight > 600 ? 600 : window.innerHeight - 20;
             monkey.y = canvas.height - monkey.height - 10;
+            createPalmTrees();
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -101,6 +103,12 @@
             <path d="M30 55 Q 50 75 70 55" fill="none" stroke="#AA0000" stroke-width="2"/>
         </svg>`;
 
+        const palmTreeSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">
+            <path d="M45 200 Q 55 150 55 100 L 45 100 Q 45 150 55 200" fill="#8B4513"/>
+            <path d="M50 100 C 20 80 0 40 20 20 C 40 0 60 20 50 40 C 80 20 100 0 80 20 C 60 40 40 60 50 100" fill="#228B22"/>
+        </svg>`;
+
         function svgToImage(svgString, width, height) {
             return new Promise((resolve, reject) => {
                 const img = new Image(width, height);
@@ -110,13 +118,22 @@
             });
         }
 
-        let monkeyImg, bananaImg, appleImg;
+        let monkeyImg, bananaImg, appleImg, palmTreeImg;
 
         async function loadImages() {
             monkeyImg = await svgToImage(monkeySvg, monkey.width, monkey.height);
             bananaImg = await svgToImage(bananaSvg, 40, 40);
             appleImg = await svgToImage(appleSvg, 40, 40);
+            palmTreeImg = await svgToImage(palmTreeSvg, 100, 200);
+            createPalmTrees();
             startGame();
+        }
+
+        function createPalmTrees() {
+            palmTrees = [
+                { x: 0, y: canvas.height - 200, width: 100, height: 200 },
+                { x: canvas.width - 100, y: canvas.height - 200, width: 100, height: 200 }
+            ];
         }
 
         function drawSky() {
@@ -160,6 +177,12 @@
             }
         }
 
+        function drawPalmTrees() {
+            palmTrees.forEach(tree => {
+                ctx.drawImage(palmTreeImg, tree.x, tree.y, tree.width, tree.height);
+            });
+        }
+
         function drawMonkey() {
             ctx.drawImage(monkeyImg, monkey.x, monkey.y, monkey.width, monkey.height);
         }
@@ -188,6 +211,7 @@
             drawSky();
             updateClouds();
             drawClouds();
+            drawPalmTrees();
             drawMonkey();
             createFruit();
 
@@ -244,18 +268,28 @@
 
         restartButton.addEventListener('click', resetGame);
 
-        // Touch controls
+        // Touch controls with reduced sensitivity
         let touchStartX = 0;
+        let lastMoveTime = 0;
+        const moveThreshold = 20; // pixels
+        const moveDelay = 100; // milliseconds
+
         canvas.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX;
         });
 
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            const currentTime = Date.now();
             const touchEndX = e.touches[0].clientX;
-            if (touchEndX < touchStartX) moveMonkey('left');
-            if (touchEndX > touchStartX) moveMonkey('right');
-            touchStartX = touchEndX;
+            const moveDistance = touchEndX - touchStartX;
+
+            if (Math.abs(moveDistance) > moveThreshold && currentTime - lastMoveTime > moveDelay) {
+                if (moveDistance < 0) moveMonkey('left');
+                if (moveDistance > 0) moveMonkey('right');
+                lastMoveTime = currentTime;
+                touchStartX = touchEndX;
+            }
         });
 
         document.addEventListener('keydown', (e) => {
@@ -263,7 +297,7 @@
             if (e.key === 'ArrowRight') moveMonkey('right');
         });
 
-        // Music (unchanged)
+        // New 8-bit soundtrack
         let audioContext;
         let oscillator;
         let gainNode;
@@ -279,13 +313,18 @@
             oscillator.type = 'square';
             gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
 
-            const notes = [262, 294, 330, 349, 392, 440, 494, 523];
+            const notes = [
+                262, 294, 330, 349, 392, 440, 494, 523,
+                494, 440, 392, 349, 330, 294, 262, 294,
+                330, 349, 392, 440, 494, 523, 587, 523,
+                494, 440, 392, 349, 330, 294, 262, 247
+            ];
             let noteIndex = 0;
 
             function playNextNote() {
                 oscillator.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
                 noteIndex = (noteIndex + 1) % notes.length;
-                setTimeout(playNextNote, 250);
+                setTimeout(playNextNote, 200);
             }
 
             oscillator.start();
