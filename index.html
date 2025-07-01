@@ -197,11 +197,26 @@
         }
 
         function createFruit() {
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.02) { // Keep existing spawn rate logic
+                const fruitWidth = 40; // Banana and apple width
+                // Ensure palmTrees is not empty and canvas has a width, otherwise skip fruit creation
+                if (palmTrees.length === 0 || canvas.width <= 0) {
+                    return;
+                }
+                const selectedTree = palmTrees[Math.floor(Math.random() * palmTrees.length)];
+
+                // Calculate fruit starting position based on the selected tree
+                // X: Randomly within the tree's width, accounting for fruit width
+                // Y: Near the top of the tree, from the leafy part
+                // Ensure selectedTree.width is greater than fruitWidth to avoid negative random range
+                const spawnableWidth = selectedTree.width - fruitWidth;
+                const fruitX = selectedTree.x + (spawnableWidth > 0 ? Math.random() * spawnableWidth : 0);
+                const fruitY = selectedTree.y + selectedTree.height * 0.25; // Fall from ~1/4 down the tree height
+
                 const fruit = {
-                    x: Math.random() * (canvas.width - 40),
-                    y: 0,
-                    type: Math.random() < 0.7 ? 'banana' : 'apple'
+                    x: fruitX,
+                    y: fruitY,
+                    type: Math.random() < 0.7 ? 'banana' : 'apple' // Keep existing fruit type logic
                 };
                 (fruit.type === 'banana' ? bananas : apples).push(fruit);
             }
